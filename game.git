@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jumping Game with Shop and Gravity</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+            display: block;
+            margin: 20px auto;
+        }
+        #gameOverScreen, #shop {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            color: #FFF;
+            text-align: center;
+            padding-top: 100px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="gameOverScreen">
+        <h2>Game Over!</h2>
+        <p id="finalScore"></p>
+        <button onclick="restartGame()">Restart</button>
+    </div>
+    <div id="shop">
+        <h2>Shop</h2>
+        <p>Score: <span id="shopScore"></span></p>
+        <button onclick="buyPower('doubleJump')">Buy Double Jump (50 points)</button>
+        <button onclick="buyPower('invincibility')">Buy Invincibility (100 points)</button>
+        <button onclick="closeShop()">Close Shop</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreElement = document.getElementById('finalScore');
+        const shop = document.getElementById('shop');
+        const shopScoreElement = document.getElementById('shopScore');
+
+        let player = {
+            x: 50,
+            y: canvas.height - 30,
+            width: 20,
+            height: 20,
+            color: '#00F',
+            jumping: false,
+            jumpHeight: 50,
+            jumpCount: 0,
+            doubleJump: false,
+            invincibility: false,
+            gravity: 0.5, // Gravity force
+            velocityY: 0 // Vertical velocity
+        };
+
+        let cones = [];
+        let blocks = [];
+        let slimes = [];
+        let lives = 3;
+        let score = 0;
+        let level = 1;
+
+        // Shop
+        let shopScore = 0;
+        let doubleJumpCost = 50;
+        let invincibilityCost = 100;
+
+        function drawPlayer() {
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function drawCones() {
+            ctx.fillStyle = '#F00';
+            cones.forEach(cone => {
+                ctx.fillRect(cone.x, cone.y, cone.width, cone.height);
+            });
+        }
+
+        function drawBlocks() {
+            ctx.fillStyle = '#0F0';
+            blocks.forEach(block => {
+                ctx.fillRect(block.x, block.y, block.width, block.height);
+            });
+        }
+
+        function drawSlimes() {
+            ctx.fillStyle = '#00F';
+            slimes.forEach(slime => {
+                ctx.fillRect(slime.x, slime.y, slime.width, slime.height);
+            });
+        }
+
+        function updateGameArea() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Update player
+            player.velocityY += player.gravity; // Apply gravity
+            player.y += player.velocityY;
+
+            if (player.y > canvas.height - player.height) {
+                player.y = canvas.height - player.height;
+                player.jumping = false;
+                player.velocityY = 0;
+            }
+
+            drawPlayer();
+            drawCones();
+            drawBlocks();
+            drawSlimes();
+
+            // Check for collisions with cones
+            cones.forEach((cone, index) => {
+                if (
+                    player.x < cone.x + cone.width &&
+                    player.x + player.width > cone.x &&
+                    player.y < cone.y + cone.height &&
+                    player.y + player.height > cone.y
+                ) {
+                    // Collision with cone detected
+                    cones.splice(index, 1);
+                    loseLife();
+                }
+            });
+
+            // Check for collisions with blocks
+            blocks.forEach((block, index) => {
+                if (
+                    player.x < block.x + block.width &&
+                    player.x + player.width > block.x &&
+                    player.y < block.y + block.height &&
+                    player.y + player.height > block.y
+                ) {
+                    // Collision with block detected
+                    loseLife();
+                }
+            });
+
+            // Check for collisions with slimes
+            slimes.forEach((slime, index) => {
+                if (
+                    player.x < slime.x + slime.width &&
+                    player.x + player.width > slime.x &&
+                    player.y < slime.y + slime.height &&
+                    player.y + player.height > slime.y
+                ) {
+                    // Collision with slime detected
+                    jumpOnSlime(index);
+                }
+            });
+
+            // Display lives, score, and level
+            ctx.fillStyle = '#FFF';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Lives: ${lives}`, 10, 30);
+            ctx.fillText(`Score: ${score}`, 10, 60);
+            ctx.fillText(`Level: ${level}`, 10, 90);
+        }
+
+        function moveLeft() {
+            player.x -= 5;
+            updateGameArea();
+        }
+
+        function moveRight() {
+            player.x += 5;
+            updateGameArea();
+        }
+
+        function jump() {
+            if ((!player.jumping && player.y === canvas.height - player.height) || player.doubleJump) {
+                player.jumping = true;
+                player.velocityY = -player.jumpHeight / 10; // Adjusted jump velocity
+                if (player.doubleJump) {
+                    player.doubleJump = false; // Use double jump
+                }
+            }
+        }
+
+        function loseLife() {
+            if (!player.invincibility) {
+                lives--;
+                if (lives <= 0) {
+                    gameOver();
+                }
+            }
+        }
+
+        function jumpOnSlime(index) {
+            slimes.splice(index, 1);
+            score += 10;
+        }
+
+        function gameOver() {
+            gameOverScreen.style.display = 'block';
+            finalScoreElement.textContent = `Your final score is ${score}.`;
+        }
+
+        function restartGame() {
+            lives = 3;
+            score = 0;
+            level = 1;
+            player.x = 50;
+            player.y = canvas.height - 30;
+            player.doubleJump = false;
+            player.invincibility = false;
+            player.velocityY = 0;
+            cones = [];
+            blocks = [];
+            slimes = [];
+            gameOverScreen.style.display = 'none';
+            shop.style.display = 'none';
+        }
+
+        function openShop() {
+            shop.style.display = 'block';
+            shopScoreElement.textContent = shopScore;
+        }
+
+        function closeShop() {
+            shop.style.display = 'none';
+        }
+
+        function buyPower(power) {
+            if (power === 'doubleJump' && shopScore >= doubleJumpCost) {
+                player.doubleJump = true;
+                shopScore -= doubleJumpCost;
+                shopScoreElement.textContent = shopScore;
+            } else if (power === 'invincibility' && shopScore >= invincibilityCost) {
+                player.invincibility = true;
+                shopScore -= invincibilityCost;
+                shopScoreElement.textContent = shopScore;
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            switch(event.key) {
+                case 'ArrowLeft':
+                    moveLeft();
+                    break;
+                case 'ArrowRight':
+                    moveRight();
+                    break;
+                case 'Space':
+                    jump();
+                    break;
+                case 'S':
+                case 's':
+                    openShop();
+                    break;
+            }
+        });
+
+        function spawnCone() {
+            const cone = {
+                x: canvas.width,
+                y: canvas.height - 30,
+                width: 10 + Math.random() * 20,
+                height: 10 + Math.random() * 20
+            };
+            cones.push(cone);
+        }
+
+        function spawnBlock() {
+            const block = {
+                x: canvas.width,
+                y: canvas.height - 20,
+                width: 30,
+                height: 20,
+                speed: 3 + Math.random() * 2
+            };
+            blocks.push(block);
+        }
+
+        function spawnSlime() {
+            const slime = {
+                x: canvas.width,
+                y: 50 + Math.random() * (canvas.height - 100),
+                width: 20,
+                height: 20,
+                speed: 2 + Math.random() * 2
+            };
+            slimes.push(slime);
+        }
+
+        setInterval(function() {
+            spawnCone();
+            score++;
+        }, 2000);  // Spawn a cone every 2 seconds
+
+        setInterval(function() {
+            spawnBlock();
+        }, 3000);  // Spawn a block every 3 seconds
+
+        setInterval(function() {
+            spawnSlime();
+        }, 5000);  // Spawn a slime every 5 seconds
+
+        setInterval(function() {
+            updateBlocks();
+        }, 20);  // Update the block positions every 20 milliseconds
+
+        setInterval(updateGameArea, 20);  // Update the game area every 20 milliseconds
+    </script>
+</body>
+</html>
